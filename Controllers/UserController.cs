@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using VerifyEmailForgotPassword.Data;
 using VerifyEmailForgotPassword.Models;
@@ -40,12 +41,76 @@ namespace VerifyEmailForgotPassword.Controllers
             return Ok(user);
         }
 
+        [HttpPost("login")]
+        public async Task<IActionResult> login(UserLoginRequest request)
+        {
+            var user = await _dataContext.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+            if(user == null)
+            {
+                return BadRequest("User Not Found");
+            }
+
+            if (!VerifyPasswordHash(request.Password, user.PasswordHash, user.PasswordSalt))
+            {
+                return BadRequest("Password is Incorrect");
+            }
+
+            if (user.VerifiedAt == null)
+            {
+                return BadRequest("User Not Verified");
+            }
+            
+
+            return Ok($"Welcome Back, {user.Email} ! :");
+        }
+
+        [HttpPost("verify")]
+        public async Task<IActionResult> Verify(string token)
+        {
+            var user = await _dataContext.Users.FirstOrDefaultAsync(u => u.VerificationToken == token);
+            if (user == null)
+            {
+                return BadRequest("Invalid Token");
+            }
+
+            user.VerifiedAt = DateTime.Now;
+            await _dataContext.SaveChangesAsync();
+
+
+            return Ok("User Verified! ");
+        }
+
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword(string email)
+        {
+            var user = await _dataContext.Users.FirstOrDefaultAsync(u => u.Email == email);
+            if (user == null)
+            {
+                return BadRequest("User not Found");
+            }
+
+            user.PasswordResetToken = CreateRandomToken();
+            await _dataContext.SaveChangesAsync();
+
+
+            return Ok("User Verified! ");
+        }
+
         private void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt)
         {
             using (var hmac = new HMACSHA512())
             {
                 passwordSalt = hmac.Key;
                 passwordHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
+            }
+        }
+
+        private bool VerifyPasswordHash(string password, byte[] passwordHash, byte[] passwordSalt)
+        {
+            using (var hmac = new HMACSHA512(passwordSalt))
+            {
+                var computedPasswordHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
+                return computedPasswordHash.SequenceEqual(passwordHash);
             }
         }
 
