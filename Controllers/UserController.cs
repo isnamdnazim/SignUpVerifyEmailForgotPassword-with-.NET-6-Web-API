@@ -90,10 +90,11 @@ namespace VerifyEmailForgotPassword.Controllers
             }
 
             user.PasswordResetToken = CreateRandomToken();
+            user.ResetTokenExpires = DateTime.Now.AddDays(1);
             await _dataContext.SaveChangesAsync();
 
 
-            return Ok("User Verified! ");
+            return Ok("You can reset your password");
         }
 
         private void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt)
