@@ -61,7 +61,7 @@ namespace VerifyEmailForgotPassword.Controllers
             }
             
 
-            return Ok($"Welcome Back, {user.Email} ! :");
+            return Ok($"Welcome Back, {user.Email} !");
         }
 
         [HttpPost("verify")]
@@ -95,6 +95,27 @@ namespace VerifyEmailForgotPassword.Controllers
 
 
             return Ok("You can reset your password");
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword(ResetPasswordRequest request)
+        {
+            var user = await _dataContext.Users.FirstOrDefaultAsync(u => u.PasswordResetToken == request.Token);
+            if (user == null || user.ResetTokenExpires < DateTime.Now)
+            {
+                return BadRequest("Invalid Token.");
+            }
+
+            CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwordSalt);
+            user.PasswordHash = passwordHash;
+            user.PasswordSalt = passwordSalt;
+            user.PasswordResetToken = null;
+            user.ResetTokenExpires = null;
+
+            await _dataContext.SaveChangesAsync();
+
+
+            return Ok("Password Successfully Reset");
         }
 
         private void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt)
